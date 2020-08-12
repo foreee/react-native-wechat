@@ -801,3 +801,32 @@ typedef NS_ENUM(UInt64, enAppSupportContentFlag)
 
 @end
 
+
+#pragma mark - WXMiniProgramObject
+/*! @brief 小程序消息结构体
+ *
+ *用于微信终端和第三方程序之间传递消息的小程序消息内容
+ *
+ */
+@interface WXMiniProgramObject : NSObject
+/*! @brief 返回一个WXMiniProgramObject对象
+ *
+ * @note 返回的WXMiniProgramObject对象是自动释放的
+ */
++(WXMiniProgramObject *) object;
+
+/** 网页的url地址
+ * @note 兼容低版本的网页链接
+ */
+@property (nonatomic, retain) NSString *webpageUrl;
+
+/** 小程序原始id
+ *
+ */
+@property (nonatomic, retain) NSString *userName;
+/** 小程序页面路径
+ *
+ */
+@property (nonatomic, retain) NSString *path;
+
+@end

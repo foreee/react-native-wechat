@@ -285,7 +285,24 @@ RCT_EXPORT_METHOD(pay:(NSDictionary *)data
                                        MediaTag:mediaTagName
                                        callBack:callback];
 
-        } else {
+        } else if ([type isEqualToString:RCTWXShareTypeMiniProgram]) {
+            NSString * webpageUrl = aData[RCTWXShareWebpageUrl];
+            WXMiniProgramObject *miniProgramObj = [WXMiniProgramObject object];
+            miniProgramObj.webpageUrl = webpageUrl; // 兼容低版本的网页链接
+            //miniProgramObj.miniprogramType = WXMiniProgramObject.MINIPTOGRAM_TYPE_RELEASE;// 正式版:0，测试版:1，体验版:2
+            miniProgramObj.userName = aData[@"userName"];     // 小程序原始id
+            miniProgramObj.path = aData[@"path"];
+            [self shareToWeixinWithMediaMessage:aScene
+                                          Title:title
+                                    Description:description
+                                         Object:miniProgramObj
+                                     MessageExt:messageExt
+                                  MessageAction:messageAction
+                                     ThumbImage:aThumbImage
+                                       MediaTag:mediaTagName
+                                       callBack:callback];
+            
+        }  else {
             callback(@[@"message type unsupported"]);
         }
     }
@@ -297,11 +314,18 @@ RCT_EXPORT_METHOD(pay:(NSDictionary *)data
     NSString *imageUrl = aData[RCTWXShareTypeThumbImageUrl];
     if (imageUrl.length && _bridge.imageLoader) {
         NSURL *url = [NSURL URLWithString:imageUrl];
-        NSURLRequest *imageRequest = [NSURLRequest requestWithURL:url];
-        [_bridge.imageLoader loadImageWithURLRequest:imageRequest size:CGSizeMake(100, 100) scale:1 clipped:FALSE resizeMode:RCTResizeModeStretch progressBlock:nil partialLoadBlock:nil
-            completionBlock:^(NSError *error, UIImage *image) {
+        UIImage *image = [UIImage imageWithData:[NSData dataWithContentsOfURL:url]];
+        if ([aData[RCTWXShareType] isEqualToString:RCTWXShareTypeMiniProgram]) {
+             
             [self shareToWeixinWithData:aData thumbImage:image scene:aScene callBack:aCallBack];
-        }];
+        }else{
+            NSURLRequest *imageRequest = [NSURLRequest requestWithURL:url];
+            [_bridge.imageLoader loadImageWithURLRequest:imageRequest size:CGSizeMake(100, 100) scale:1 clipped:FALSE resizeMode:RCTResizeModeStretch progressBlock:nil partialLoadBlock:nil
+                completionBlock:^(NSError *error, UIImage *image) {
+                [self shareToWeixinWithData:aData thumbImage:image scene:aScene callBack:aCallBack];
+            }];
+        }
+        
     } else {
         [self shareToWeixinWithData:aData thumbImage:nil scene:aScene callBack:aCallBack];
     }
@@ -358,44 +382,44 @@ RCT_EXPORT_METHOD(pay:(NSDictionary *)data
 
 -(void) onResp:(BaseResp*)resp
 {
-	if([resp isKindOfClass:[SendMessageToWXResp class]])
-	{
-	    SendMessageToWXResp *r = (SendMessageToWXResp *)resp;
+    if([resp isKindOfClass:[SendMessageToWXResp class]])
+    {
+        SendMessageToWXResp *r = (SendMessageToWXResp *)resp;
     
-	    NSMutableDictionary *body = @{@"errCode":@(r.errCode)}.mutableCopy;
-	    body[@"errStr"] = r.errStr;
-	    body[@"lang"] = r.lang;
-	    body[@"country"] =r.country;
-	    body[@"type"] = @"SendMessageToWX.Resp";
-	    [self.bridge.eventDispatcher sendDeviceEventWithName:RCTWXEventName body:body];
-	} else if ([resp isKindOfClass:[SendAuthResp class]]) {
-	    SendAuthResp *r = (SendAuthResp *)resp;
-	    NSMutableDictionary *body = @{@"errCode":@(r.errCode)}.mutableCopy;
-	    body[@"errStr"] = r.errStr;
-	    body[@"state"] = r.state;
-	    body[@"lang"] = r.lang;
-	    body[@"country"] =r.country;
-	    body[@"type"] = @"SendAuth.Resp";
+        NSMutableDictionary *body = @{@"errCode":@(r.errCode)}.mutableCopy;
+        body[@"errStr"] = r.errStr;
+        body[@"lang"] = r.lang;
+        body[@"country"] =r.country;
+        body[@"type"] = @"SendMessageToWX.Resp";
+        [self.bridge.eventDispatcher sendDeviceEventWithName:RCTWXEventName body:body];
+    } else if ([resp isKindOfClass:[SendAuthResp class]]) {
+        SendAuthResp *r = (SendAuthResp *)resp;
+        NSMutableDictionary *body = @{@"errCode":@(r.errCode)}.mutableCopy;
+        body[@"errStr"] = r.errStr;
+        body[@"state"] = r.state;
+        body[@"lang"] = r.lang;
+        body[@"country"] =r.country;
+        body[@"type"] = @"SendAuth.Resp";
     
-	    if (resp.errCode == WXSuccess) {
-	        if (self.appId && r) {
-		    // ios第一次获取不到appid会卡死，加个判断OK		
-		    [body addEntriesFromDictionary:@{@"appid":self.appId, @"code":r.code}];
-		    [self.bridge.eventDispatcher sendDeviceEventWithName:RCTWXEventName body:body];
-	        }
-	    }
-	    else {
-	        [self.bridge.eventDispatcher sendDeviceEventWithName:RCTWXEventName body:body];
-	    }
-	} else if ([resp isKindOfClass:[PayResp class]]) {
-	        PayResp *r = (PayResp *)resp;
-	        NSMutableDictionary *body = @{@"errCode":@(r.errCode)}.mutableCopy;
-	        body[@"errStr"] = r.errStr;
-	        body[@"type"] = @(r.type);
-	        body[@"returnKey"] =r.returnKey;
-	        body[@"type"] = @"PayReq.Resp";
-	        [self.bridge.eventDispatcher sendDeviceEventWithName:RCTWXEventName body:body];
-    	}
+        if (resp.errCode == WXSuccess) {
+            if (self.appId && r) {
+            // ios第一次获取不到appid会卡死，加个判断OK
+            [body addEntriesFromDictionary:@{@"appid":self.appId, @"code":r.code}];
+            [self.bridge.eventDispatcher sendDeviceEventWithName:RCTWXEventName body:body];
+            }
+        }
+        else {
+            [self.bridge.eventDispatcher sendDeviceEventWithName:RCTWXEventName body:body];
+        }
+    } else if ([resp isKindOfClass:[PayResp class]]) {
+            PayResp *r = (PayResp *)resp;
+            NSMutableDictionary *body = @{@"errCode":@(r.errCode)}.mutableCopy;
+            body[@"errStr"] = r.errStr;
+            body[@"type"] = @(r.type);
+            body[@"returnKey"] =r.returnKey;
+            body[@"type"] = @"PayReq.Resp";
+            [self.bridge.eventDispatcher sendDeviceEventWithName:RCTWXEventName body:body];
+        }
 }
 
 @end
